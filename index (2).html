@@ -6,21 +6,22 @@
     <title>綠色商店後台管理</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <!-- Import Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+    <script src="https://unpkg.com/papaparse@5.3.2/papaparse.min.js"></script>
     <style>
-        /* Basic styling for the application */
+        :root { --primary-color: #10B981; --primary-hover: #059669; }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
         .sidebar-item { transition: all 0.2s ease-in-out; }
-        .sidebar-item:hover, .sidebar-item.active { background-color: #10B981; color: white; transform: translateX(4px); }
+        .sidebar-item:hover, .sidebar-item.active { background-color: var(--primary-color); color: white; transform: translateX(4px); }
         .spinner { border-top-color: #3498db; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .modal-content { max-height: 85vh; }
+        .btn-primary { background-color: var(--primary-color); color: white; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        #csvImportDropzone { border: 2px dashed #ccc; transition: all 0.3s ease; }
+        #csvImportDropzone.dragover { border-color: var(--primary-color); background-color: #f0fdf4; }
     </style>
 </head>
 <body class="bg-gray-100 font-sans">
@@ -29,11 +30,13 @@
         <div id="loginScreen" class="flex items-center justify-center min-h-screen bg-gray-200">
             <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-center text-gray-800">後台管理登入</h2>
-                <p class="text-center text-gray-600">請使用 Google 帳號登入</p>
-                <button id="loginButton" class="w-full px-4 py-3 font-semibold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 flex items-center justify-center">
-                    <i class="fab fa-google mr-2"></i>
-                    使用 Google 登入
-                </button>
+                <form id="loginForm">
+                    <div>
+                        <label for="password" class="text-sm font-medium text-gray-700">密碼</label>
+                        <input type="password" id="password" class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500" placeholder="請輸入密碼" required>
+                    </div>
+                    <button type="submit" id="loginButton" class="w-full px-4 py-2 font-semibold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2">登入</button>
+                </form>
             </div>
         </div>
 
@@ -46,15 +49,14 @@
                     <nav class="flex-1 px-4 py-4 space-y-2">
                         <a href="#" data-section="mainDashboard" class="sidebar-item active flex items-center px-4 py-2 rounded-md"><i class="fas fa-tachometer-alt w-6"></i>儀表板</a>
                         <a href="#" data-section="shops" class="sidebar-item flex items-center px-4 py-2 rounded-md"><i class="fas fa-store w-6"></i>店家管理</a>
+                        <a href="#" data-section="bannedShops" class="sidebar-item flex items-center px-4 py-2 rounded-md"><i class="fas fa-trash-alt w-6"></i>回收桶</a>
+                        <a href="#" data-section="tags" class="sidebar-item flex items-center px-4 py-2 rounded-md"><i class="fas fa-tags w-6"></i>標籤管理</a>
+                        <a href="#" data-section="leaderboard" class="sidebar-item flex items-center px-4 py-2 rounded-md"><i class="fas fa-trophy w-6"></i>排行榜</a>
                         <a href="#" data-section="subscribers" class="sidebar-item flex items-center px-4 py-2 rounded-md"><i class="fas fa-users w-6"></i>訂閱者管理</a>
                         <a href="#" data-section="announcements" class="sidebar-item flex items-center px-4 py-2 rounded-md"><i class="fas fa-bullhorn w-6"></i>公告管理</a>
                         <a href="#" data-section="policies" class="sidebar-item flex items-center px-4 py-2 rounded-md"><i class="fas fa-file-alt w-6"></i>政策管理</a>
                     </nav>
-                    <div class="px-4 py-4">
-                        <button id="logoutButton" class="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
-                            <i class="fas fa-sign-out-alt mr-2"></i>登出
-                        </button>
-                    </div>
+                    <div class="px-4 py-4"><button id="logoutButton" class="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"><i class="fas fa-sign-out-alt mr-2"></i>登出</button></div>
                 </div>
 
                 <!-- Main Content -->
@@ -90,25 +92,12 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Firebase configuration
-    const firebaseConfig = {
-        apiKey: "AIzaSy_your_api_key",
-        authDomain: "greenroof-8951b.firebaseapp.com",
-        projectId: "greenroof-8951b",
-        storageBucket: "greenroof-8951b.appspot.com",
-        messagingSenderId: "505320924738",
-        appId: "1:505320924738:web:19318b7462725f776269c3"
-    };
-
-    // Initialize Firebase
-    const app = firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    const API_URL = 'https://script.google.com/macros/s/AKfycbzIcS0WXSQV0yNt5lyjvHy7hwDIUItkGeG78T_Yz2mKa83HJMgI9UxsfVIelU6PyKFwkw/exec';
 
     const ui = {
         loginScreen: document.getElementById('loginScreen'),
         dashboard: document.getElementById('dashboard'),
-        loginButton: document.getElementById('loginButton'),
+        loginForm: document.getElementById('loginForm'),
         logoutButton: document.getElementById('logoutButton'),
         sidebarItems: document.querySelectorAll('.sidebar-item'),
         mainContent: document.getElementById('mainContent'),
@@ -134,54 +123,81 @@ document.addEventListener('DOMContentLoaded', () => {
     const showErrorModal = (error) => {
         let details = `錯誤類型: ${error.name || '未知錯誤'}\n`;
         details += `錯誤訊息: ${error.message}\n\n`;
+        if (error.responseText) {
+            details += `後端原始回應 (可能是HTML錯誤頁):\n------------------------------------\n${error.responseText}\n------------------------------------\n\n`;
+        }
         if (error.stack) { details += `堆疊追蹤:\n${error.stack}`; }
         ui.errorDetails.textContent = details;
         ui.errorModal.classList.remove('hidden');
     };
 
-    const handleLogin = async () => {
-        const provider = new firebase.auth.GoogleAuthProvider();
+    async function apiFetch(action, params = {}) {
+        ui.loadingIndicator.classList.remove('hidden');
         try {
-            await auth.signInWithPopup(provider);
-        } catch (error) {
-            showErrorModal(error);
-        }
-    };
+            const token = localStorage.getItem('authToken');
+            if (action !== 'login' && !token) {
+                logout();
+                throw new Error("Auth token not found. Please log in again.");
+            }
 
-    const handleLogout = async () => {
-        try {
-            await auth.signOut();
-        } catch (error) {
-            showErrorModal(error);
-        }
-    };
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action, token, ...params }),
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                mode: 'cors'
+            });
 
-    const checkAdminRole = async (user) => {
-        if (!user) {
-            ui.loginScreen.classList.remove('hidden');
-            ui.dashboard.classList.add('hidden');
-            return;
-        }
-
-        try {
-            const adminDoc = await db.collection('admins').doc(user.uid).get();
-            if (adminDoc.exists) {
-                ui.loginScreen.classList.add('hidden');
-                ui.dashboard.classList.remove('hidden');
-                navigateTo('mainDashboard');
-            } else {
-                showErrorModal(new Error('您沒有管理員權限。'));
-                await auth.signOut();
+            const text = await response.text();
+            try {
+                const result = JSON.parse(text);
+                 if (result.status === 'error') {
+                    if (result.message && result.message.toLowerCase().includes('token')) logout();
+                    throw new Error(result.message || 'Unknown backend error');
+                }
+                return result.data;
+            } catch (e) {
+                const err = new Error("無法解碼字串。後端可能回傳了非預期的內容 (例如 HTML 錯誤頁面)。");
+                err.responseText = text;
+                err.stack = e.stack;
+                throw err;
             }
         } catch (error) {
             showErrorModal(error);
-            await auth.signOut();
+            throw error;
+        } finally {
+            ui.loadingIndicator.classList.add('hidden');
         }
+    }
+
+    const login = async (password) => {
+        try {
+            const data = await apiFetch('login', { payload: { password } });
+            if (data && data.token) {
+                localStorage.setItem('authToken', data.token);
+                ui.loginScreen.classList.add('hidden');
+                ui.dashboard.classList.remove('hidden');
+                navigateTo('mainDashboard');
+            }
+        } catch (error) { document.getElementById('password').value = ''; }
     };
 
-    auth.onAuthStateChanged(user => {
-        checkAdminRole(user);
-    });
+    const logout = () => {
+        localStorage.removeItem('authToken');
+        ui.dashboard.classList.add('hidden');
+        ui.loginScreen.classList.remove('hidden');
+        ui.mainContent.innerHTML = '';
+    };
+
+    const checkLogin = () => {
+        if (localStorage.getItem('authToken')) {
+            ui.loginScreen.classList.add('hidden');
+            ui.dashboard.classList.remove('hidden');
+            navigateTo('mainDashboard');
+        } else {
+             ui.dashboard.classList.add('hidden');
+             ui.loginScreen.classList.remove('hidden');
+        }
+    };
 
     const openModal = (title, bodyHtml, saveHandler) => {
         ui.modalTitle.textContent = title;
@@ -190,21 +206,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const newSaveButton = ui.saveModalButton.cloneNode(true);
         ui.saveModalButton.parentNode.replaceChild(newSaveButton, ui.saveModalButton);
         ui.saveModalButton = newSaveButton;
-        if (saveHandler) {
-            ui.saveModalButton.onclick = saveHandler;
-        }
+        ui.saveModalButton.onclick = saveHandler;
     };
 
     const closeModal = () => ui.formModal.classList.add('hidden');
     
     const openShopForm = async (shopId = null) => {
-        let shop = {};
-        if (shopId) {
-            const doc = await db.collection('shops').doc(shopId).get();
-            if (doc.exists) {
-                shop = { id: doc.id, ...doc.data() };
-            }
-        }
+        const [shopData, tagsData] = await Promise.all([
+            shopId ? apiFetch('getShopById', { id: shopId }) : Promise.resolve({ shop: {} }),
+            apiFetch('getTags')
+        ]);
+        const shop = shopData.shop;
+        const allTags = tagsData.tags;
+        const shopTagIds = new Set(shop.tags ? shop.tags.map(t => t.id) : []);
 
         const title = shopId ? '編輯店家' : '新增店家';
         const formHtml = `
@@ -222,10 +236,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div><label class="block">緯度 (Lat)</label><input type="text" name="lat" class="w-full border p-2 rounded" value="${shop.lat || ''}"></div>
                     <div><label class="block">經度 (Lng)</label><input type="text" name="lng" class="w-full border p-2 rounded" value="${shop.lng || ''}"></div>
                 </div>
+                <div><label class="block font-medium">標籤</label>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 border p-2 rounded-md max-h-48 overflow-y-auto">
+                        ${allTags.map(tag => `
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" name="tags" value="${tag.id}" class="rounded" ${shopTagIds.has(tag.id) ? 'checked' : ''}>
+                                <span>${tag['name_zh-TW']}</span>
+                            </label>`).join('')}
+                    </div>
+                </div>
                 <div><label class="block">簡短描述 (繁中)</label><textarea name="description_zh-TW" class="w-full border p-2 rounded h-24">${shop['description_zh-TW'] || ''}</textarea></div>
                 <div><label class="block">長描述 (繁中)</label><textarea name="longDescription_zh-TW" class="w-full border p-2 rounded h-24">${shop['longDescription_zh-TW'] || ''}</textarea></div>
-                <div><label class="block">簡短描述 (English)</label><textarea name="description_en" class="w-full border p-2 rounded h-24">${shop['description_en'] || ''}</textarea></div>
-                <div><label class="block">長描述 (English)</label><textarea name="longDescription_en" class="w-full border p-2 rounded h-24">${shop['longDescription_en'] || ''}</textarea></div>
             </form>`;
         openModal(title, formHtml, saveShop);
     };
@@ -234,49 +255,104 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = document.getElementById('shopForm');
         const formData = new FormData(form);
         const shopData = Object.fromEntries(formData.entries());
-
-        try {
-            if (shopData.id) {
-                const id = shopData.id;
-                delete shopData.id;
-                await db.collection('shops').doc(id).set(shopData, { merge: true });
-            } else {
-                delete shopData.id;
-                await db.collection('shops').add(shopData);
-            }
-            closeModal();
-            showToast('店家已儲存！');
-            navigateTo('shops');
-        } catch (error) {
-            showErrorModal(error);
-        }
+        shopData.tags = formData.getAll('tags');
+        await apiFetch('saveShop', { shop: shopData });
+        closeModal();
+        showToast('店家已儲存！');
+        navigateTo('shops');
     };
     
     const pageRenderers = {
         mainDashboard: async () => {
-            const shopsSnapshot = await db.collection('shops').get();
-            const subscribersSnapshot = await db.collection('subscribers').get();
-            return `<h1 class="text-3xl font-bold mb-6">儀表板</h1><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div class="p-6 bg-white rounded-lg shadow"><h2 class="text-lg font-medium text-gray-600">總訂閱數</h2><p class="text-4xl font-bold text-emerald-600 mt-2">${subscribersSnapshot.size}</p></div><div class="p-6 bg-white rounded-lg shadow"><h2 class="text-lg font-medium text-gray-600">總店家數</h2><p class="text-4xl font-bold text-blue-600 mt-2">${shopsSnapshot.size}</p></div></div>`;
+            const data = await apiFetch('getDashboardStats');
+            return `<h1 class="text-3xl font-bold mb-6">儀表板</h1>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                        <div class="p-6 bg-white rounded-lg shadow"><h2 class="text-lg font-medium text-gray-600">總店家數</h2><p class="text-4xl font-bold text-blue-600 mt-2">${data.totalShops}</p></div>
+                        <div class="p-6 bg-white rounded-lg shadow"><h2 class="text-lg font-medium text-gray-600">總標籤數</h2><p class="text-4xl font-bold text-yellow-600 mt-2">${data.totalTags}</p></div>
+                        <div class="p-6 bg-white rounded-lg shadow"><h2 class="text-lg font-medium text-gray-600">總訂閱數</h2><p class="text-4xl font-bold text-emerald-600 mt-2">${data.totalSubscribers}</p></div>
+                        <div class="p-6 bg-white rounded-lg shadow"><h2 class="text-lg font-medium text-gray-600">總回饋數</h2><p class="text-4xl font-bold text-purple-600 mt-2">${data.totalFeedback}</p></div>
+                    </div>
+                    <div class="mt-8 bg-white p-6 rounded-lg shadow">
+                        <h2 class="text-2xl font-bold mb-4">CSV 匯入店家</h2>
+                        <div id="csvImportDropzone" class="p-8 text-center rounded-lg">
+                            <p class="mb-4 text-gray-500">拖放 CSV 檔案到此處，或點擊選擇檔案</p>
+                            <input type="file" id="csvFile" accept=".csv" class="hidden">
+                            <button id="uploadCsvButton" class="btn-primary px-6 py-2 rounded-md">選擇檔案</button>
+                        </div>
+                        <div id="csv-preview" class="mt-4 hidden max-h-64 overflow-auto"></div>
+                    </div>`;
         },
         subscribers: async () => {
-            const snapshot = await db.collection('subscribers').get();
-            const subscribers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            return `<h1 class="text-3xl font-bold mb-6">訂閱者管理</h1><div class="bg-white p-6 rounded-lg shadow overflow-x-auto"><table class="min-w-full"><thead><tr><th class="py-2 px-4 text-left">Email</th><th class="py-2 px-4 text-left">訂閱時間</th><th class="py-2 px-4 text-left">操作</th></tr></thead><tbody>${subscribers.map(s => `<tr><td class="py-2 px-4 border-b">${s.email}</td><td class="py-2 px-4 border-b">${s.timestamp.toDate().toLocaleString()}</td><td class="py-2 px-4 border-b"><button class="text-red-500 hover:text-red-700" data-action="delete-subscriber" data-id="${s.id}">刪除</button></td></tr>`).join('')}</tbody></table></div>`;
+            const data = await apiFetch('getSubscribers');
+            return `<h1 class="text-3xl font-bold mb-6">訂閱者管理</h1><div class="bg-white p-6 rounded-lg shadow overflow-x-auto"><table class="min-w-full"><thead><tr><th class="py-2 px-4 text-left">Email</th><th class="py-2 px-4 text-left">訂閱時間</th><th class="py-2 px-4 text-left">操作</th></tr></thead><tbody>${data.subscribers.map(s => `<tr><td class="py-2 px-4 border-b">${s.email}</td><td class="py-2 px-4 border-b">${new Date(s.timestamp).toLocaleString()}</td><td class="py-2 px-4 border-b"><button class="text-red-500 hover:text-red-700" data-action="delete-subscriber" data-email="${s.email}">刪除</button></td></tr>`).join('')}</tbody></table></div>`;
         },
         announcements: async () => {
-            const doc = await db.collection('site_settings').doc('announcements').get();
-            const announcements = doc.exists ? doc.data().content : '';
-            return `<h1 class="text-3xl font-bold mb-6">公告管理</h1><div class="bg-white p-6 rounded-lg shadow"><label for="announcementsEditor" class="block text-lg font-medium mb-2">公告內容</label><textarea id="announcementsEditor" class="w-full h-48 p-3 border rounded">${announcements}</textarea><button id="saveAnnouncements" class="mt-4 px-4 py-2 text-white bg-emerald-600 rounded">儲存</button></div>`;
+            const data = await apiFetch('getAnnouncements');
+            return `<h1 class="text-3xl font-bold mb-6">公告管理</h1><div class="bg-white p-6 rounded-lg shadow"><label for="announcementsEditor" class="block text-lg font-medium mb-2">公告內容</label><textarea id="announcementsEditor" class="w-full h-48 p-3 border rounded">${data.announcements}</textarea><button id="saveAnnouncements" class="mt-4 px-4 py-2 text-white bg-emerald-600 rounded">儲存</button></div>`;
         },
         policies: async () => {
-            const doc = await db.collection('site_settings').doc('policies').get();
-            const policies = doc.exists ? doc.data() : { privacy: '', disclaimer: '' };
-            return `<h1 class="text-3xl font-bold mb-6">政策管理</h1><div class="bg-white p-6 rounded-lg shadow space-y-6"><div><label for="privacy" class="block text-lg font-medium mb-2">隱私權政策</label><textarea id="privacy" class="w-full h-48 p-3 border rounded">${policies.privacy || ''}</textarea><button data-key="privacy" class="save-policy mt-2 px-4 py-2 text-white bg-emerald-600">儲存</button></div><div><label for="disclaimer" class="block text-lg font-medium mb-2">免責聲明</label><textarea id="disclaimer" class="w-full h-48 p-3 border rounded">${policies.disclaimer || ''}</textarea><button data-key="disclaimer" class="save-policy mt-2 px-4 py-2 text-white bg-emerald-600">儲存</button></div></div>`;
+            const data = await apiFetch('getPolicies');
+            return `<h1 class="text-3xl font-bold mb-6">政策管理</h1><div class="bg-white p-6 rounded-lg shadow space-y-6"><div><label for="privacy" class="block text-lg font-medium mb-2">隱私權政策</label><textarea id="privacy" class="w-full h-48 p-3 border rounded">${data.privacy || ''}</textarea><button data-key="privacy" class="save-policy mt-2 px-4 py-2 text-white bg-emerald-600">儲存</button></div><div><label for="disclaimer" class="block text-lg font-medium mb-2">免責聲明</label><textarea id="disclaimer" class="w-full h-48 p-3 border rounded">${data.disclaimer || ''}</textarea><button data-key="disclaimer" class="save-policy mt-2 px-4 py-2 text-white bg-emerald-600">儲存</button></div></div>`;
         },
         shops: async () => {
-            const snapshot = await db.collection('shops').get();
-            const shops = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            return `<div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-bold">店家管理</h1><button id="add-shop" class="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700">新增店家</button></div><div class="bg-white p-6 rounded-lg shadow overflow-x-auto"><table class="min-w-full"><thead><tr><th class="py-2 px-4 text-left">店家名稱</th><th class="py-2 px-4 text-left">類型</th><th class="py-2 px-4 text-left">操作</th></tr></thead><tbody>${shops.map(s => `<tr><td class="py-2 px-4 border-b">${s['name_zh-TW']}</td><td class="py-2 px-4 border-b">${s['type_zh-TW']}</td><td class="py-2 px-4 border-b space-x-2"><button class="text-blue-500" data-action="edit-shop" data-id="${s.id}">編輯</button><button class="text-red-500" data-action="delete-shop" data-id="${s.id}">刪除</button><button class="text-purple-500" data-action="recommend-shop" data-id="${s.id}">推薦</button></td></tr>`).join('')}</tbody></table></div>`;
+            const data = await apiFetch('getShops');
+            return `<div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-bold">店家管理</h1><button id="add-shop" class="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700">新增店家</button></div><div class="bg-white p-6 rounded-lg shadow overflow-x-auto"><table class="min-w-full"><thead><tr><th class="py-2 px-4 text-left">店家名稱</th><th class="py-2 px-4 text-left">類型</th><th class="py-2 px-4 text-left">標籤</th><th class="py-2 px-4 text-left">操作</th></tr></thead><tbody>${data.shops.map(s => `<tr><td class="py-2 px-4 border-b">${s['name_zh-TW']}</td><td class="py-2 px-4 border-b">${s['type_zh-TW']}</td><td class="py-2 px-4 border-b">${(s.tags || []).map(t => `<span class="bg-gray-200 text-gray-700 px-2 py-1 text-xs rounded-full">${t['name_zh-TW']}</span>`).join(' ')}</td><td class="py-2 px-4 border-b space-x-2"><button class="text-blue-500" data-action="edit-shop" data-id="${s.id}">編輯</button><button class="text-red-500" data-action="delete-shop" data-id="${s.id}">移至回收桶</button><button class="text-purple-500" data-action="recommend-shop" data-id="${s.id}">推薦</button></td></tr>`).join('')}</tbody></table></div>`;
+        },
+        bannedShops: async () => {
+            const data = await apiFetch('getBannedShops');
+            return `<div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-bold">回收桶</h1></div>
+                    <div class="bg-white p-6 rounded-lg shadow overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead><tr><th class="py-2 px-4 text-left">店家名稱</th><th class="py-2 px-4 text-left">操作</th></tr></thead>
+                            <tbody>${data.shops.map(s => `
+                                <tr>
+                                    <td class="py-2 px-4 border-b">${s['name_zh-TW']}</td>
+                                    <td class="py-2 px-4 border-b space-x-2">
+                                        <button class="text-green-500" data-action="restore-shop" data-id="${s.id}">還原</button>
+                                        <button class="text-red-700" data-action="delete-shop-permanently" data-id="${s.id}">永久刪除</button>
+                                    </td>
+                                </tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>`;
+        },
+        tags: async () => {
+            const data = await apiFetch('getTags');
+            return `<div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-bold">標籤管理</h1></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-lg shadow">
+                           <h2 class="text-xl font-bold mb-4">新增標籤</h2>
+                           <form id="addTagForm" class="space-y-4">
+                                <div><label class="block">名稱 (繁中)</label><input type="text" name="name_zh-TW" class="w-full border p-2 rounded" required></div>
+                                <div><label class="block">名稱 (English)</label><input type="text" name="name_en" class="w-full border p-2 rounded" required></div>
+                                <button type="submit" class="btn-primary px-4 py-2 rounded-md">新增</button>
+                           </form>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h2 class="text-xl font-bold mb-4">現有標籤</h2>
+                            <div class="max-h-96 overflow-y-auto">
+                                <table class="min-w-full">
+                                    <tbody>${data.tags.map(t => `<tr><td class="py-2 px-4 border-b">${t['name_zh-TW']} (${t['name_en']})</td><td class="py-2 px-4 border-b text-right"><button class="text-red-500" data-action="delete-tag" data-id="${t.id}">刪除</button></td></tr>`).join('')}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>`;
+        },
+        leaderboard: async () => {
+            const data = await apiFetch('getLeaderboard');
+            return `<h1 class="text-3xl font-bold mb-6">排行榜 (依標籤數)</h1>
+                    <div class="bg-white p-6 rounded-lg shadow overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead><tr><th class="py-2 px-4 text-left">排名</th><th class="py-2 px-4 text-left">店家</th><th class="py-2 px-4 text-left">分數</th></tr></thead>
+                            <tbody>${data.leaderboard.map((item, index) => `
+                                <tr>
+                                    <td class="py-2 px-4 border-b font-bold">${index + 1}</td>
+                                    <td class="py-2 px-4 border-b">${item['name_zh-TW']}</td>
+                                    <td class="py-2 px-4 border-b">${item.score}</td>
+                                </tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>`;
         }
     };
 
@@ -286,14 +362,74 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             ui.mainContent.innerHTML = await pageRenderers[sectionId]();
         } catch(e) {
-            showErrorModal(e);
             ui.mainContent.innerHTML = `<div class="text-red-500 p-4 bg-red-100 rounded">無法載入。請檢查錯誤彈窗以獲取詳細資訊。</div>`;
         }
     };
     
+    function setupCsvImport() {
+        const dropzone = document.getElementById('csvImportDropzone');
+        const fileInput = document.getElementById('csvFile');
+        const uploadButton = document.getElementById('uploadCsvButton');
+
+        uploadButton.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropzone.addEventListener(eventName, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+        dropzone.addEventListener('dragover', () => dropzone.classList.add('dragover'));
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+        dropzone.addEventListener('drop', e => {
+            dropzone.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        function handleFile(file) {
+            if (file && file.type === 'text/csv') {
+                Papa.parse(file, {
+                    header: true,
+                    complete: (results) => {
+                        displayCsvPreview(results.data);
+                        confirmAndUpload(file);
+                    }
+                });
+            } else {
+                showErrorModal(new Error("請選擇一個 CSV 檔案。"));
+            }
+        }
+
+        function displayCsvPreview(data) {
+             const previewDiv = document.getElementById('csv-preview');
+             let table = `<table class="min-w-full text-xs"><thead><tr>${Object.keys(data[0]).map(h => `<th class="p-1 border text-left">${h}</th>`).join('')}</tr></thead><tbody>`;
+             data.slice(0, 5).forEach(row => {
+                 table += `<tr>${Object.values(row).map(c => `<td class="p-1 border">${c}</td>`).join('')}</tr>`;
+             });
+             table += `</tbody></table><p class="text-xs text-center mt-2">僅顯示前 5 筆預覽...</p>`;
+             previewDiv.innerHTML = table;
+             previewDiv.classList.remove('hidden');
+        }
+
+        function confirmAndUpload(file) {
+            if (confirm(`預覽正確嗎？確定要匯入 ${Papa.parse(file, { header: true }).data.length} 間店家嗎？`)) {
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        const result = await apiFetch('importShopsFromCsv', { csvContent: event.target.result });
+                        showToast(result.message);
+                        navigateTo('shops');
+                    } catch (e) { /* handled by apiFetch */ }
+                };
+                reader.readAsText(file);
+            }
+        }
+    }
+
     const setupEventListeners = () => {
-        ui.loginButton.addEventListener('click', handleLogin);
-        ui.logoutButton.addEventListener('click', handleLogout);
+        ui.loginForm.addEventListener('submit', (e) => { e.preventDefault(); login(document.getElementById('password').value); });
+        ui.logoutButton.addEventListener('click', logout);
         ui.closeErrorModal.addEventListener('click', () => ui.errorModal.classList.add('hidden'));
         ui.closeModalButton.addEventListener('click', closeModal);
         ui.closeModalButtonX.addEventListener('click', closeModal);
@@ -304,42 +440,81 @@ document.addEventListener('DOMContentLoaded', () => {
             const target = e.target;
             const action = target.dataset.action;
             const id = target.dataset.id;
+            const email = target.dataset.email;
 
             try {
                 if (target.id === 'add-shop') { openShopForm(); }
                 if (action === 'edit-shop') { openShopForm(id); }
-                if (action === 'delete-shop' && confirm(`確定要刪除此店家嗎？`)) {
-                    await db.collection('shops').doc(id).delete();
-                    showToast('店家已刪除');
+                if (action === 'delete-shop' && confirm(`確定要將此店家移至回收桶嗎？`)) {
+                    await apiFetch('deleteShop', { id });
+                    showToast('店家已移至回收桶');
                     navigateTo('shops');
                 }
+                if (action === 'restore-shop' && confirm('確定要還原此店家嗎？')) {
+                    await apiFetch('restoreShop', { id });
+                    showToast('店家已還原');
+                    navigateTo('bannedShops');
+                }
+                if (action === 'delete-shop-permanently' && prompt('此操作無法復原。請輸入店家 ID 以確認永久刪除：') === id) {
+                    await apiFetch('deleteShopPermanently', { id });
+                    showToast('店家已永久刪除');
+                    navigateTo('bannedShops');
+                }
                 if (action === 'delete-subscriber' && confirm(`確定要刪除此訂閱者嗎？`)) {
-                    await db.collection('subscribers').doc(id).delete();
+                    await apiFetch('deleteSubscriber', { email });
                     showToast('訂閱者已刪除');
                     navigateTo('subscribers');
                 }
                 if (action === 'recommend-shop' && confirm(`確定要向所有訂閱者推薦此店家嗎？`)) {
-                    console.log(`Recommendation sent for shop ID: ${id}`);
+                    await apiFetch('sendRecommendation', { shopId: id });
                     showToast('推薦信已開始發送');
                 }
                 if (target.id === 'saveAnnouncements') {
                     const content = document.getElementById('announcementsEditor').value;
-                    await db.collection('site_settings').doc('announcements').set({ content });
+                    await apiFetch('setAnnouncements', { payload: { content } });
                     showToast('公告已儲存');
                 }
                 if (target.classList.contains('save-policy')) {
                     const key = target.dataset.key;
                     const value = document.getElementById(key).value;
-                    await db.collection('site_settings').doc('policies').set({ [key]: value }, { merge: true });
+                    await apiFetch('setPolicy', { payload: { key, value } });
                     showToast('政策已儲存');
                 }
-            } catch(error) {
-                showErrorModal(error);
+                 if (action === 'delete-tag' && confirm('確定要刪除此標籤嗎？')) {
+                    await apiFetch('deleteTag', { tagId: id });
+                    showToast('標籤已刪除');
+                    navigateTo('tags');
+                }
+            } catch(error) { /* Handled by apiFetch */ }
+        });
+
+        ui.mainContent.addEventListener('submit', async(e) => {
+            if (e.target.id === 'addTagForm') {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const payload = Object.fromEntries(formData.entries());
+                try {
+                    await apiFetch('addTag', { payload });
+                    showToast('標籤已新增');
+                    navigateTo('tags');
+                } catch(e) { /* Handled by apiFetch */ }
             }
         });
+
+        // Setup CSV import only when on dashboard
+        if (document.querySelector('[data-section="mainDashboard"]').classList.contains('active')) {
+            setupCsvImport();
+        }
+        const observer = new MutationObserver(() => {
+            if(document.getElementById('csvImportDropzone')){
+                setupCsvImport();
+            }
+        });
+        observer.observe(ui.mainContent, { childList: true });
     };
 
     setupEventListeners();
+    checkLogin();
 });
 </script>
 </body>
