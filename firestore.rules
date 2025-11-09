@@ -1,0 +1,41 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check for admin privileges
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Admins: Read-only for everyone, only admins can write
+    match /admins/{adminId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Reviews: Read-only for everyone, only admins can write new reviews.
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Shops: Read-only for everyone, admins can create, update, and delete.
+    match /shops/{shopId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Site Settings (e.g., announcements, policies): Read-only for the public.
+    match /site_settings/{setting} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Subscribers: Read-only for the public, only admins can write.
+    match /subscribers/{subscriberId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}
