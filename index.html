@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="pageTitle">永續商店地圖 - 首頁</title>
+    <title data-i18n="pageTitle">Greenroof - Home</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -41,10 +41,8 @@
     <nav class="bg-white shadow-md sticky top-0 z-50">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
              <div class="flex items-center space-x-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <a href="#" class="text-2xl font-bold text-gray-800" data-i18n="appName">永續商店地圖</a>
+                <img src="https://github.com/ntu-hsu/Greenroof/blob/main/logo.png?raw=true" alt="Greenroof Logo" class="h-8 w-8">
+                <a href="#" class="text-2xl font-bold text-gray-800" data-i18n="appName">Greenroof</a>
             </div>
             <div class="hidden md:flex space-x-6 items-center">
                 <a href="#" class="text-gray-700 hover:text-green-600 transition" data-i18n="home">首頁</a>
@@ -53,14 +51,26 @@
                 <a href="#newsletter" class="text-gray-700 hover:text-green-600 transition" data-i18n="newsletter">訂閱電子報</a>
                 <a href="#report-issue" class="text-gray-700 hover:text-green-600 transition" data-i18n="reportIssueNavLink">問題回報</a>
                 <select id="language-select" class="bg-green-500 text-white text-sm px-3 py-1 rounded-full hover:bg-green-700 transition cursor-pointer">
-                    <option value="zh-TW" data-i18n="langChinese">繁體中文</option>
                     <option value="en" data-i18n="langEnglish">English</option>
+                    <option value="zh-TW" data-i18n="langChinese">繁體中文</option>
+                    <option value="fr" data-i18n="langFrench">Français</option>
+                    <option value="es" data-i18n="langSpanish">Español</option>
+                    <option value="de" data-i18n="langGerman">Deutsch</option>
+                    <option value="ja" data-i18n="langJapanese">日本語</option>
+                    <option value="ko" data-i18n="langKorean">한국어</option>
+                    <option value="la" data-i18n="langLatin">Latina</option>
                 </select>
             </div>
              <div class="md:hidden flex items-center">
                 <select id="language-select-mobile" class="bg-green-500 text-white text-sm px-3 py-1 rounded-full hover:bg-green-700 transition cursor-pointer mr-2">
-                    <option value="zh-TW" data-i18n="langChinese">繁體中文</option>
                     <option value="en" data-i18n="langEnglish">English</option>
+                    <option value="zh-TW" data-i18n="langChinese">繁體中文</option>
+                    <option value="fr" data-i18n="langFrench">Français</option>
+                    <option value="es" data-i18n="langSpanish">Español</option>
+                    <option value="de" data-i18n="langGerman">Deutsch</option>
+                    <option value="ja" data-i18n="langJapanese">日本語</option>
+                    <option value="ko" data-i18n="langKorean">한국어</option>
+                    <option value="la" data-i18n="langLatin">Latina</option>
                 </select>
                 <button id="menu-toggle" class="text-gray-700">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -178,7 +188,7 @@
 
     <footer class="bg-gray-800 text-white py-10">
         <div class="container mx-auto px-4 text-center">
-            <p data-i18n="copyright">© 2025 永續商店地圖 - 版權所有</p>
+            <p data-i18n="copyright">© 2025 Greenroof - All Rights Reserved</p>
         </div>
     </footer>
 
@@ -220,39 +230,40 @@ document.addEventListener('DOMContentLoaded', () => {
     let mapInstance;
     let markersGroup = L.featureGroup();
     let favoriteShops = JSON.parse(localStorage.getItem('favoriteShops')) || [];
-    let currentLang = localStorage.getItem('lang') || 'zh-TW';
+    let currentLang = localStorage.getItem('lang') || 'en';
 
     const translations = {
         'zh-TW': {
-            pageTitle: '永續商店地圖 - 首頁', appName: '永續商店地圖', home: '首頁', map: '地圖', shopList: '商店列表', newsletter: '訂閱電子報', reportIssueNavLink: '問題回報',
-            langChinese: '繁體中文', langEnglish: 'English',
-            heroTitle: '探索台灣永續商店', heroSubtitle: '找到支持環保、公平貿易和永續發展的商店，一起為地球盡一份心力',
+            pageTitle: 'Greenroof - 首頁', appName: 'Greenroof', home: '首頁', map: '地圖', shopList: '商店列表', newsletter: '訂閱電子報', reportIssueNavLink: '問題回報',
+            langEnglish: 'English', langChinese: '繁體中文', langFrench: '法文', langSpanish: '西班牙文', langGerman: '德文', langJapanese: '日文', langKorean: '韓文', langLatin: '拉丁文',
+            heroTitle: '探索 Greenroof 永續商店', heroSubtitle: '找到支持環保、公平貿易和永續發展的商店，一起為地球盡一份心力',
             viewMapBtn: '查看地圖', browseShopsBtn: '瀏覽商店列表', searchTitle: '搜尋永續商店', searchPlaceholder: '輸入商店名稱或地址...',
             filterCategoryTitle: '依類別篩選', filterAll: '全部', filterFavorites: '我的收藏',
-            mapSectionTitle: '永續商店地圖', shopListSectionTitle: '永續商店列表', viewDetailsBtn: '查看詳情', loadMoreBtn: '載入更多',
+            mapSectionTitle: 'Greenroof 地圖', shopListSectionTitle: '永續商店列表', viewDetailsBtn: '查看詳情', loadMoreBtn: '載入更多',
             newsletterTitle: '訂閱永續生活電子報', newsletterSubtitle: '獲取最新的永續商店資訊、環保生活技巧和特別優惠', newsletterPlaceholder: '您的電子郵件', subscribeBtn: '訂閱',
             reportIssueTitle: '問題回報', reportIssueLabel: '請描述您遇到的問題：', reportIssuePlaceholder: '例如：某間商店資訊錯誤、地圖位置有誤...', reportIssueSubmitBtn: '送出回報',
             reportIssueSuccessMsg: '感謝您的回報，我們會儘快處理！', reportIssueErrorMsg: '回報失敗，請稍後再試。',
-            okButton: '確定', notProvided: '未提供', copyright: '© 2025 永續商店地圖 - 版權所有',
+            okButton: '確定', notProvided: '未提供', copyright: '© 2025 Greenroof - 版權所有',
             modalAddress: '地址', modalOpeningHours: '營業時間', modalContactInfo: '聯絡方式', modalPhone: '電話', modalWebsite: '網站',
             apiError: '發生錯誤，請稍後再試。', newsletterSuccess: '感謝您的訂閱！',
             errorModalTitle: '發生錯誤'
         },
         'en': {
-            pageTitle: 'Sustainable Store Map - Home', appName: 'Sustainable Store Map', home: 'Home', map: 'Map', shopList: 'Shop List', newsletter: 'Newsletter', reportIssueNavLink: 'Report Issue',
-            langChinese: '繁體中文', langEnglish: 'English',
-            heroTitle: 'Explore Taiwan\'s Sustainable Stores', heroSubtitle: 'Find stores that support environmental protection, fair trade, and sustainable development.',
+            pageTitle: 'Greenroof - Home', appName: 'Greenroof', home: 'Home', map: 'Map', shopList: 'Shop List', newsletter: 'Newsletter', reportIssueNavLink: 'Report Issue',
+            langEnglish: 'English', langChinese: '中文', langFrench: 'French', langSpanish: 'Spanish', langGerman: 'German', langJapanese: 'Japanese', langKorean: 'Korean', langLatin: 'Latin',
+            heroTitle: 'Explore Greenroof\'s Sustainable Stores', heroSubtitle: 'Find stores that support environmental protection, fair trade, and sustainable development.',
             viewMapBtn: 'View Map', browseShopsBtn: 'Browse Shops', searchTitle: 'Search Sustainable Stores', searchPlaceholder: 'Enter store name or address...',
             filterCategoryTitle: 'Filter by Category', filterAll: 'All', filterFavorites: 'My Favorites',
-            mapSectionTitle: 'Sustainable Store Map', shopListSectionTitle: 'Sustainable Shop List', viewDetailsBtn: 'View Details', loadMoreBtn: 'Load More',
+            mapSectionTitle: 'Greenroof Map', shopListSectionTitle: 'Sustainable Shop List', viewDetailsBtn: 'View Details', loadMoreBtn: 'Load More',
             newsletterTitle: 'Subscribe to our Newsletter', newsletterSubtitle: 'Get the latest sustainable store info, eco-friendly tips, and special offers.', newsletterPlaceholder: 'Your email', subscribeBtn: 'Subscribe',
             reportIssueTitle: 'Report an Issue', reportIssueLabel: 'Please describe the issue you encountered:', reportIssuePlaceholder: 'e.g., Incorrect store information, wrong map location...', reportIssueSubmitBtn: 'Submit Report',
             reportIssueSuccessMsg: 'Thank you for your report, we will process it soon!', reportIssueErrorMsg: 'Failed to submit report. Please try again later.',
-            okButton: 'OK', notProvided: 'Not provided', copyright: '© 2025 Sustainable Store Map - All Rights Reserved',
+            okButton: 'OK', notProvided: 'Not provided', copyright: '© 2025 Greenroof - All Rights Reserved',
             modalAddress: 'Address', modalOpeningHours: 'Opening Hours', modalContactInfo: 'Contact Info', modalPhone: 'Phone', modalWebsite: 'Website',
             apiError: 'An error occurred. Please try again later.', newsletterSuccess: 'Thank you for subscribing!',
             errorModalTitle: 'An Error Occurred'
-        }
+        },
+        'fr': {}, 'es': {}, 'de': {}, 'ja': {}, 'ko': {}, 'la': {}
     };
 
     // ===== UI ELEMENTS =====
