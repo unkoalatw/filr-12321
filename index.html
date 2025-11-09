@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="pageTitle">Greenroof - Home</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -34,6 +35,10 @@
 </head>
 <body class="text-gray-800">
 
+    <div id="client-id-warning" class="hidden bg-red-500 text-white p-4 text-center">
+        <strong>Warning:</strong> The Google Client ID is a placeholder. Sign-in will not work until it is replaced with a valid ID in `index.html`.
+    </div>
+
     <div id="loading-overlay" class="flex items-center justify-center">
         <div class="loader"></div>
     </div>
@@ -60,6 +65,15 @@
                     <option value="ko" data-i18n="langKorean">한국어</option>
                     <option value="la" data-i18n="langLatin">Latina</option>
                 </select>
+                <div id="g_id_onload"
+                     data-client_id="YOUR_GOOGLE_CLIENT_ID"
+                     data-callback="handleCredentialResponse">
+                </div>
+                <div class="g_id_signin" data-type="standard"></div>
+                <div id="user-profile" class="hidden items-center space-x-2">
+                    <img id="user-avatar" class="h-8 w-8 rounded-full" src="" alt="User Avatar">
+                    <button id="logout-button" class="text-gray-700 hover:text-green-600 transition">Logout</button>
+                </div>
             </div>
              <div class="md:hidden flex items-center">
                 <select id="language-select-mobile" class="bg-green-500 text-white text-sm px-3 py-1 rounded-full hover:bg-green-700 transition cursor-pointer mr-2">
@@ -102,6 +116,15 @@
     </section>
 
     <main>
+        <section id="video-intro" class="py-12 bg-white">
+            <div class="container mx-auto px-4 text-center">
+                <h2 class="text-3xl font-bold mb-4" data-i18n="videoSectionTitle">Discover Our Mission</h2>
+                <p class="max-w-3xl mx-auto mb-8 text-gray-600" data-i18n="videoSectionSubtitle">Watch our video to learn more about the Greenroof project and how you can contribute to a more sustainable future.</p>
+                <div class="aspect-w-16 aspect-h-9 max-w-4xl mx-auto">
+                    <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen class="w-full h-full rounded-lg shadow-lg"></iframe>
+                </div>
+            </div>
+        </section>
         <section class="py-12 bg-white">
             <div class="container mx-auto px-4">
                 <div class="max-w-4xl mx-auto">
@@ -188,6 +211,10 @@
 
     <footer class="bg-gray-800 text-white py-10">
         <div class="container mx-auto px-4 text-center">
+            <div class="mb-4">
+                <a href="privacy.html" class="text-gray-400 hover:text-white mx-2">Privacy Policy</a>
+                <a href="disclaimer.html" class="text-gray-400 hover:text-white mx-2">Disclaimer</a>
+            </div>
             <p data-i18n="copyright">© 2025 Greenroof - All Rights Reserved</p>
         </div>
     </footer>
@@ -220,6 +247,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // ===== CONFIGURATION =====
     const API_URL = 'https://script.google.com/macros/s/AKfycbzIcS0WXSQV0yNt5lyjvHy7hwDIUItkGeG78T_Yz2mKa83HJMgI9UxsfVIelU6PyKFwkw/exec';
+    const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID'; // Replace with your actual client ID
 
     // ===== GLOBAL STATE =====
     let allShops = [];
@@ -252,6 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
             pageTitle: 'Greenroof - Home', appName: 'Greenroof', home: 'Home', map: 'Map', shopList: 'Shop List', newsletter: 'Newsletter', reportIssueNavLink: 'Report Issue',
             langEnglish: 'English', langChinese: '中文', langFrench: 'French', langSpanish: 'Spanish', langGerman: 'German', langJapanese: 'Japanese', langKorean: 'Korean', langLatin: 'Latin',
             heroTitle: 'Explore Greenroof\'s Sustainable Stores', heroSubtitle: 'Find stores that support environmental protection, fair trade, and sustainable development.',
+            videoSectionTitle: 'Discover Our Mission', videoSectionSubtitle: 'Watch our video to learn more about the Greenroof project and how you can contribute to a more sustainable future.',
             viewMapBtn: 'View Map', browseShopsBtn: 'Browse Shops', searchTitle: 'Search Sustainable Stores', searchPlaceholder: 'Enter store name or address...',
             filterCategoryTitle: 'Filter by Category', filterAll: 'All', filterFavorites: 'My Favorites',
             mapSectionTitle: 'Greenroof Map', shopListSectionTitle: 'Sustainable Shop List', viewDetailsBtn: 'View Details', loadMoreBtn: 'Load More',
@@ -337,7 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
-            const translation = translations[lang]?.[key] || translations['zh-TW'][key];
+            const translation = translations[lang]?.[key] || translations['en'][key];
             if (el.placeholder) {
                 el.placeholder = translation;
             } else {
@@ -402,7 +431,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="p-6">
                     <div>
                         <h3 class="text-xl font-bold">${shop[`name_${currentLang}`] || shop['name_zh-TW']}</h3>
-                        <span class="tag px-2 py-1 rounded-full text-xs">${shop[`type_${currentLang}`] || shop['type_zh-TW']}</span>
+                        <div class="my-2 flex flex-wrap gap-2">
+                            <span class="tag px-2 py-1 rounded-full text-xs">${shop[`type_${currentLang}`] || shop['type_zh-TW']}</span>
+                            ${(shop.badges || '').split(',').map(badge => badge.trim()).filter(badge => badge).map(badge => `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">${badge}</span>`).join('')}
+                        </div>
                         <p class="text-gray-600 my-4 h-20 overflow-hidden">${shop[`description_${currentLang}`] || shop['description_zh-TW']}</p>
                     </div>
                     <button class="block w-full text-center py-2 btn-primary rounded-lg font-medium view-details-btn" data-shop-id="${shop.id}">${translations[currentLang].viewDetailsBtn}</button>
@@ -451,7 +483,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.shopDetailContainer.innerHTML = `
             <div class="shop-detail-header py-12 text-white rounded-t-xl text-center relative">
                 <h1 class="text-3xl font-bold">${shop[`name_${currentLang}`] || shop['name_zh-TW']}</h1>
-                <p class="text-lg">${shop[`type_${currentLang}`] || shop['type_zh-TW']}</p>
+                <div class="mt-2 flex justify-center flex-wrap gap-2">
+                    <span class="tag px-2 py-1 rounded-full text-xs">${shop[`type_${currentLang}`] || shop['type_zh-TW']}</span>
+                    ${(shop.badges || '').split(',').map(badge => badge.trim()).filter(badge => badge).map(badge => `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">${badge}</span>`).join('')}
+                </div>
                 <button id="close-modal" class="absolute top-4 right-4 bg-white/80 rounded-full p-2 text-gray-800"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
             </div>
             <div class="p-6">
@@ -478,6 +513,30 @@ document.addEventListener('DOMContentLoaded', () => {
     function showMessage(message) {
         ui.messageModalText.textContent = message;
         ui.messageModal.classList.remove('hidden');
+    }
+
+    function decodeJwt(token) {
+        try {
+            return JSON.parse(atob(token.split('.')[1]));
+        } catch (e) {
+            return null;
+        }
+    }
+
+    window.handleCredentialResponse = (response) => {
+        const credential = response.credential;
+        const profile = decodeJwt(credential);
+        if (profile) {
+            document.querySelector('.g_id_signin').classList.add('hidden');
+            document.getElementById('user-profile').classList.remove('hidden');
+            document.getElementById('user-avatar').src = profile.picture;
+        }
+    }
+
+    function logout() {
+        document.querySelector('.g_id_signin').classList.remove('hidden');
+        document.getElementById('user-profile').classList.add('hidden');
+        document.getElementById('user-avatar').src = '';
     }
 
     // ===== EVENT HANDLERS =====
@@ -613,9 +672,27 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('close-message-modal').addEventListener('click', () => ui.messageModal.classList.add('hidden'));
         document.getElementById('close-error-modal').addEventListener('click', () => ui.errorModal.classList.add('hidden'));
         ui.shopDetailModal.addEventListener('click', (e) => e.target === ui.shopDetailModal && closeModal());
+        document.getElementById('logout-button').addEventListener('click', logout);
+    }
+
+    function initializeGoogleSignIn() {
+        google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: handleCredentialResponse
+        });
+        google.accounts.id.renderButton(
+            document.querySelector(".g_id_signin"),
+            { theme: "outline", size: "large" }
+        );
+        document.getElementById('g_id_onload').dataset.client_id = GOOGLE_CLIENT_ID;
     }
 
     initialize();
+    initializeGoogleSignIn();
+
+    if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID') {
+        document.getElementById('client-id-warning').classList.remove('hidden');
+    }
 });
 </script>
 

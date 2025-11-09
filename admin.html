@@ -217,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div><label class="block">Address (English)</label><input type="text" name="address_en" class="w-full border p-2 rounded" value="${shop['address_en'] || ''}"></div>
                     <div><label class="block">Phone</label><input type="text" name="phone" class="w-full border p-2 rounded" value="${shop.phone || ''}"></div>
                     <div><label class="block">Website</label><input type="text" name="website" class="w-full border p-2 rounded" value="${shop.website || ''}"></div>
+                <div><label class="block">Badges (comma-separated)</label><input type="text" name="badges" class="w-full border p-2 rounded" value="${shop.badges || ''}"></div>
                     <div><label class="block">Latitude (Lat)</label><input type="text" name="lat" class="w-full border p-2 rounded" value="${shop.lat || ''}"></div>
                     <div><label class="block">Longitude (Lng)</label><input type="text" name="lng" class="w-full border p-2 rounded" value="${shop.lng || ''}"></div>
                 </div>
@@ -257,7 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         shops: async () => {
             const data = await apiFetch('getShops');
-            return `<div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-bold">Shop Management</h1><button id="add-shop" class="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700">Add Shop</button></div><div class="bg-white p-6 rounded-lg shadow overflow-x-auto"><table class="min-w-full"><thead><tr><th class="py-2 px-4 text-left">Shop Name</th><th class="py-2 px-4 text-left">Type</th><th class="py-2 px-4 text-left">Actions</th></tr></thead><tbody>${data.shops.map(s => `<tr><td class="py-2 px-4 border-b">${s['name_zh-TW']}</td><td class="py-2 px-4 border-b">${s['type_zh-TW']}</td><td class="py-2 px-4 border-b space-x-2"><button class="text-blue-500" data-action="edit-shop" data-id="${s.id}">Edit</button><button class="text-red-500" data-action="delete-shop" data-id="${s.id}">Delete</button><button class="text-purple-500" data-action="recommend-shop" data-id="${s.id}">Recommend</button></td></tr>`).join('')}</tbody></table></div>`;
+            return `<div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-bold">Shop Management</h1><button id="add-shop" class="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700">Add Shop</button></div><div class="bg-white p-6 rounded-lg shadow overflow-x-auto"><table class="min-w-full"><thead><tr><th class="py-2 px-4 text-left">Shop Name</th><th class="py-2 px-4 text-left">Type</th><th class="py-2 px-4 text-left">Actions</th></tr></thead><tbody>${data.shops.map(s => `<tr><td class="py-2 px-4 border-b">${s['name_en'] || s['name_zh-TW']}</td><td class="py-2 px-4 border-b">${s['type_en'] || s['type_zh-TW']}</td><td class="py-2 px-4 border-b space-x-2"><button class="text-blue-500" data-action="edit-shop" data-id="${s.id}">Edit</button><button class="text-red-500" data-action="delete-shop" data-id="${s.id}">Delete</button><button class="text-purple-500" data-action="recommend-shop" data-id="${s.id}">Recommend</button></td></tr>`).join('')}</tbody></table></div>`;
         }
     };
 
