@@ -59,6 +59,7 @@
                     <option value="zh-TW" data-i18n="langChinese">繁體中文</option>
                     <option value="en" data-i18n="langEnglish">English</option>
                 </select>
+                <div id="auth-container" class="ml-4"></div>
             </div>
              <div class="md:hidden flex items-center">
                 <select id="language-select-mobile" class="bg-green-500 text-white text-sm px-3 py-1 rounded-full hover:bg-green-700 transition cursor-pointer mr-2">
@@ -76,6 +77,7 @@
             <a href="#shops" class="block py-2 text-gray-700 hover:text-green-600" data-i18n="shopList">商店列表</a>
             <a href="#leaderboard" class="block py-2 text-gray-700 hover:text-green-600" data-i18n="leaderboard">排行榜</a>
             <a href="#newsletter" class="block py-2 text-gray-700 hover:text-green-600" data-i18n="newsletter">訂閱電子報</a>
+            <div id="auth-container-mobile" class="mt-4"></div>
         </div>
     </nav>
 
@@ -193,10 +195,25 @@
         </div>
     </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const API_URL = 'https://script.google.com/macros/s/AKfycbzIcS0WXSQV0yNt5lyjvHy7hwDIUItkGeG78T_Yz2mKa83HJMgI9UxsfVIelU6PyKFwkw/exec';
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getFirestore, collection, getDocs, doc, getDoc, setDoc, query, where, orderBy, limit, startAfter, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 
+    const firebaseConfig = {
+        apiKey: "AIzaSy...",
+        authDomain: "greenroof-8951b.firebaseapp.com",
+        projectId: "greenroof-8951b",
+        storageBucket: "greenroof-8951b.appspot.com",
+        messagingSenderId: "505320924738",
+        appId: "1:505320924738:web:19318b7462725f776269c3"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+document.addEventListener('DOMContentLoaded', () => {
     let allShops = [];
     let currentFilterCategory = 'all';
     let currentSearchQuery = '';
@@ -221,7 +238,8 @@ document.addEventListener('DOMContentLoaded', () => {
             apiError: '發生錯誤，請稍後再試。', newsletterSuccess: '感謝您的訂閱！',
             errorModalTitle: '發生錯誤',
             leaderboardTitle: '熱門店家排行榜', score: '分數',
-            reviewsTitle: '顧客評論', noReviews: '暫無評論。', addReview: '新增評論', reviewerName: '您的姓名', rating: '評分', comment: '評論內容', submitReview: '送出評論'
+            reviewsTitle: '顧客評論', noReviews: '暫無評論。', addReview: '新增評論', reviewerName: '您的姓名', rating: '評分', comment: '評論內容', submitReview: '送出評論',
+            login: '登入', logout: '登出'
         },
         'en': {
             pageTitle: 'Sustainable Store Map - Home', appName: 'Sustainable Store Map', home: 'Home', map: 'Map', shopList: 'Shop List', newsletter: 'Newsletter', leaderboard: 'Leaderboard',
@@ -236,9 +254,45 @@ document.addEventListener('DOMContentLoaded', () => {
             apiError: 'An error occurred. Please try again later.', newsletterSuccess: 'Thank you for subscribing!',
             errorModalTitle: 'An Error Occurred',
             leaderboardTitle: 'Top Shops Leaderboard', score: 'Score',
-            reviewsTitle: 'Customer Reviews', noReviews: 'No reviews yet.', addReview: 'Add a Review', reviewerName: 'Your Name', rating: 'Rating', comment: 'Comment', submitReview: 'Submit Review'
+            reviewsTitle: 'Customer Reviews', noReviews: 'No reviews yet.', addReview: 'Add a Review', reviewerName: 'Your Name', rating: 'Rating', comment: 'Comment', submitReview: 'Submit Review',
+            login: 'Login', logout: 'Logout'
         }
     };
+
+    function updateAuthUI(user) {
+        const T = (key) => translations[currentLang][key] || translations['zh-TW'][key];
+        const authContainer = document.getElementById('auth-container');
+        const authContainerMobile = document.getElementById('auth-container-mobile');
+
+        const content = user
+            ? `
+                <div class="flex items-center space-x-2">
+                    <img src="${user.photoURL}" alt="User" class="w-8 h-8 rounded-full">
+                    <button id="logout-btn" class="text-gray-700 hover:text-green-600 transition">${T('logout')}</button>
+                </div>
+            `
+            : `<button id="login-btn" class="btn-primary px-4 py-2 rounded-lg">${T('login')}</button>`;
+
+        authContainer.innerHTML = content;
+        authContainerMobile.innerHTML = content.replace('logout-btn', 'logout-btn-mobile').replace('login-btn', 'login-btn-mobile');
+
+        if (user) {
+            document.getElementById('logout-btn')?.addEventListener('click', () => auth.signOut());
+            document.getElementById('logout-btn-mobile')?.addEventListener('click', () => auth.signOut());
+        } else {
+            document.getElementById('login-btn')?.addEventListener('click', signIn);
+            document.getElementById('login-btn-mobile')?.addEventListener('click', signIn);
+        }
+    }
+
+    async function signIn() {
+        const provider = new GoogleAuthProvider();
+        try {
+            await signInWithPopup(auth, provider);
+        } catch (error) {
+            showErrorModal(error, 'Google Sign-In');
+        }
+    }
 
     const ui = {
         loadingOverlay: document.getElementById('loading-overlay'),
@@ -256,49 +310,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     function showErrorModal(error, action) {
-        let details = `Action: ${action}\n`;
-        details += `Error: ${error.name || 'Unknown Error'}: ${error.message}\n\n`;
-        if(error.responseText) {
-            details += `Backend Response:\n------------------\n${error.responseText}\n------------------\n\n`;
-        }
-        if(error.stack) {
-            details += `Stack Trace:\n${error.stack}`;
-        }
-        ui.errorDetails.textContent = details;
+        console.error("Action failed:", action, error);
+        // User-friendly message instead of technical details
+        ui.errorDetails.textContent = `An unexpected error occurred while performing the action: ${action}. Please try again later.`;
         ui.errorModal.classList.remove('hidden');
-    }
-    
-    async function apiFetch(action, payload = {}) {
-        ui.loadingOverlay.classList.remove('hidden');
-        try {
-            const body = { action, ...payload };
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(body),
-                mode: 'cors'
-            });
-
-            const text = await response.text();
-            let result;
-            try {
-                result = JSON.parse(text);
-            } catch (e) {
-                const parseError = new Error("Failed to parse JSON response from backend.");
-                parseError.responseText = text;
-                throw parseError;
-            }
-
-            if (result.status === 'error') throw new Error(result.message);
-            return result.data;
-
-        } catch (error) {
-            console.error(`API Fetch Error (${action}):`, error);
-            showErrorModal(error, action);
-            return null;
-        } finally {
-            ui.loadingOverlay.classList.add('hidden');
-        }
     }
 
     function setLanguage(lang) {
@@ -336,8 +351,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentFilterCategory === 'favorites') {
                 return favoriteShops.includes(shop.id);
             }
-            const shopTags = shop.tags ? shop.tags.map(t => t['name_zh-TW']) : [];
-            const matchesCategory = currentFilterCategory === 'all' || shopTags.includes(currentFilterCategory);
+            const shopTagIds = shop.tags ? shop.tags.map(t => t.id) : [];
+            const matchesCategory = currentFilterCategory === 'all' || shopTagIds.includes(currentFilterCategory);
 
             const name = shop[`name_${currentLang}`] || shop['name_zh-TW'] || '';
             const address = shop[`address_${currentLang}`] || shop['address_zh-TW'] || '';
@@ -393,12 +408,19 @@ document.addEventListener('DOMContentLoaded', () => {
         filteredShops.forEach(shop => {
             if(shop.lat && shop.lng) {
                 const marker = L.marker([shop.lat, shop.lng]);
-                marker.bindPopup(`
-                    <div class="p-1">
-                        <h3 class="font-bold text-base">${shop[`name_${currentLang}`] || shop['name_zh-TW']}</h3>
-                        <button onclick="window.showShopDetail('${shop.id}')" class="text-green-600 text-sm hover:underline">${translations[currentLang].viewDetailsBtn}</button>
-                    </div>
-                `);
+
+                const popupContent = document.createElement('div');
+                popupContent.className = 'p-1';
+                popupContent.innerHTML = `<h3 class="font-bold text-base">${shop[`name_${currentLang}`] || shop['name_zh-TW']}</h3>`;
+
+                const button = document.createElement('button');
+                button.className = 'text-green-600 text-sm hover:underline';
+                button.textContent = translations[currentLang].viewDetailsBtn;
+                button.onclick = () => showShopDetail(shop.id);
+
+                popupContent.appendChild(button);
+                marker.bindPopup(popupContent);
+
                 markersGroup.addLayer(marker);
             }
         });
@@ -417,8 +439,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const shop = allShops.find(s => s.id === shopId);
         if (!shop) return;
 
-        const { reviews } = await apiFetch('getReviewsForShop', { shopId });
-        
+        const reviewsCol = collection(db, 'shops', shopId, 'reviews');
+        const reviewsSnapshot = await getDocs(query(reviewsCol, orderBy('timestamp', 'desc')));
+        const reviews = reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
         ui.shopDetailModal.dataset.shopId = shopId;
         const T = (key) => translations[currentLang][key] || translations['zh-TW'][key];
 
@@ -450,13 +474,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h2 class="text-2xl font-bold mb-4">${T('reviewsTitle')}</h2>
                     <div id="reviews-list">${reviewsHtml}</div>
                  </div>
-                 <div class="mt-8 border-t pt-6">
-                    <h2 class="text-2xl font-bold mb-4">${T('addReview')}</h2>
-                    <form id="review-form" data-shop-id="${shop.id}">
-                         <div class="mb-4"><label class="block mb-1">${T('reviewerName')}</label><input type="text" id="reviewer-name" class="w-full border p-2 rounded" required></div>
-                         <div class="mb-4"><label class="block mb-1">${T('rating')}</label>
-                            <div class="rating flex flex-row-reverse justify-end">
-                                <input type="radio" id="star5" name="rating" value="5"><label for="star5" title="5 stars">☆</label>
+                 <div id="review-form-container" class="mt-8 border-t pt-6"></div>
+            </div>
+        `;
+
+        const user = auth.currentUser;
+        const reviewFormContainer = ui.shopDetailContainer.querySelector('#review-form-container');
+        if (user) {
+            reviewFormContainer.innerHTML = `
+                <h2 class="text-2xl font-bold mb-4">${T('addReview')}</h2>
+                <form id="review-form" data-shop-id="${shop.id}">
+                     <div class="mb-4"><label class="block mb-1">${T('rating')}</label>
+                        <div class="rating flex flex-row-reverse justify-end">
+                            <input type="radio" id="star5" name="rating" value="5"><label for="star5" title="5 stars">☆</label>
                                 <input type="radio" id="star4" name="rating" value="4"><label for="star4" title="4 stars">☆</label>
                                 <input type="radio" id="star3" name="rating" value="3"><label for="star3" title="3 stars">☆</label>
                                 <input type="radio" id="star2" name="rating" value="2"><label for="star2" title="2 stars">☆</label>
@@ -476,7 +506,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('close-modal').addEventListener('click', closeModal);
         document.getElementById('review-form').addEventListener('submit', handleReviewSubmit);
     }
-    window.showShopDetail = showShopDetail;
 
     async function handleReviewSubmit(e) {
         e.preventDefault();
@@ -484,21 +513,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const shopId = form.dataset.shopId;
         const rating = form.querySelector('input[name="rating"]:checked');
         if (!rating) {
-            alert('請選擇評分！');
+            alert('請選擇評分！'); // Simple validation
+            return;
+        }
+        const user = auth.currentUser;
+        if (!user) {
+            alert('Please login to submit a review.');
             return;
         }
 
         const payload = {
-            shopId: shopId,
-            authorName: document.getElementById('reviewer-name').value,
-            rating: rating.value,
-            comment: document.getElementById('review-comment').value
+            authorId: user.uid,
+            authorName: user.displayName,
+            rating: parseInt(rating.value, 10),
+            comment: document.getElementById('review-comment').value,
+            timestamp: serverTimestamp()
         };
 
-        const result = await apiFetch('submitReview', payload);
-        if (result) {
-            showToast(result.message);
-            showShopDetail(shopId); // Refresh modal
+        try {
+            const reviewsCol = collection(db, 'shops', shopId, 'reviews');
+            await addDoc(reviewsCol, payload);
+
+            // Optimistic UI update
+            const newReviewHtml = `
+                <div class="border-t pt-4 mt-4">
+                    <p class="font-semibold">${payload.authorName}</p>
+                    <p class="text-gray-600 text-yellow-400">${'★'.repeat(payload.rating)}${'☆'.repeat(5 - payload.rating)}</p>
+                    <p class="mt-2 text-gray-700">${payload.comment}</p>
+                    <p class="text-xs text-gray-400 mt-1">Just now</p>
+                </div>`;
+            document.getElementById('reviews-list').insertAdjacentHTML('afterbegin', newReviewHtml);
+            form.reset();
+
+        } catch (error) {
+            showErrorModal(error, 'Submit Review');
         }
     }
     
@@ -550,59 +598,110 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const email = document.getElementById('newsletter-email').value.trim();
         if (!email) return;
-        const result = await apiFetch('subscribe', { email });
-        if (result) {
+
+        try {
+            const subscribersCol = collection(db, 'subscribers');
+            await addDoc(subscribersCol, {
+                email: email,
+                subscribedAt: serverTimestamp()
+            });
             showMessage(translations[currentLang].newsletterSuccess);
             e.target.reset();
+        } catch (error) {
+            showErrorModal(error, 'Subscribe Newsletter');
         }
     }
 
     async function renderLeaderboard() {
-        const T = (key) => translations[currentLang][key] || translations['zh-TW'][key];
-        const { leaderboard } = await apiFetch('getLeaderboard');
-        if(leaderboard) {
-            ui.leaderboardContainer.innerHTML = `
-                <table class="min-w-full">
-                    <thead><tr><th class="py-2 px-4 text-left">#</th><th class="py-2 px-4 text-left">店家</th><th class="py-2 px-4 text-left">${T('score')}</th></tr></thead>
-                    <tbody>
-                        ${leaderboard.map((item, index) => `
-                            <tr>
-                                <td class="py-2 px-4 border-b font-bold">${index + 1}</td>
-                                <td class="py-2 px-4 border-b">${item[`name_${currentLang}`] || item['name_zh-TW']}</td>
-                                <td class="py-2 px-4 border-b">${item.score}</td>
-                            </tr>`).join('')}
-                    </tbody>
-                </table>`;
+        ui.loadingOverlay.classList.remove('hidden');
+        try {
+            const T = (key) => translations[currentLang][key] || translations['zh-TW'][key];
+            const shopsQuery = query(collection(db, 'shops'), where('status', '==', 'active'), orderBy('score', 'desc'), limit(10));
+            const querySnapshot = await getDocs(shopsQuery);
+            const leaderboard = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            if (leaderboard.length > 0) {
+                ui.leaderboardContainer.innerHTML = `
+                    <table class="min-w-full">
+                        <thead><tr><th class="py-2 px-4 text-left">#</th><th class="py-2 px-4 text-left">店家</th><th class="py-2 px-4 text-left">${T('score')}</th></tr></thead>
+                        <tbody>
+                            ${leaderboard.map((item, index) => `
+                                <tr>
+                                    <td class="py-2 px-4 border-b font-bold">${index + 1}</td>
+                                    <td class="py-2 px-4 border-b">${item[`name_${currentLang}`] || item['name_zh-TW']}</td>
+                                    <td class="py-2 px-4 border-b">${item.score || 0}</td>
+                                </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            } else {
+                ui.leaderboardContainer.innerHTML = '<p>No leaderboard data available.</p>';
+            }
+        } catch (error) {
+            showErrorModal(error, 'Render Leaderboard');
+            ui.leaderboardContainer.innerHTML = '<p>Could not load leaderboard.</p>';
+        } finally {
+            ui.loadingOverlay.classList.add('hidden');
         }
     }
 
     async function initialize() {
-        const data = await apiFetch('getPublicData');
-        if (data && data.shops) {
-            allShops = data.shops;
+        ui.loadingOverlay.classList.remove('hidden');
+        try {
+            // Auth listener
+            onAuthStateChanged(auth, user => {
+                updateAuthUI(user);
+                // Refilter if 'favorites' is selected
+                if (currentFilterCategory === 'favorites') {
+                    currentLoadedShops = 0;
+                    filterAndDisplayShops();
+                }
+            });
+
+            // Fetch shops and tags
+            const shopsQuery = query(collection(db, 'shops'), where('status', '==', 'active'));
+            const tagsQuery = collection(db, 'tags');
+
+            const [shopsSnapshot, tagsSnapshot] = await Promise.all([getDocs(shopsQuery), getDocs(tagsQuery)]);
             
-            const shopTypes = [...new Set(allShops.flatMap(s => s.tags ? s.tags.map(t => t['name_zh-TW']) : []))];
+            const tags = tagsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const tagsMap = new Map(tags.map(t => [t.id, t]));
+
+            allShops = shopsSnapshot.docs.map(doc => {
+                const shop = { id: doc.id, ...doc.data() };
+                if (shop.tags && Array.isArray(shop.tags)) {
+                    shop.tags = shop.tags.map(tagId => tagsMap.get(tagId)).filter(Boolean);
+                }
+                return shop;
+            });
+
+            // Populate filter buttons
             const filterContainer = document.getElementById('filter-buttons-container');
-            shopTypes.forEach(type => {
-                if(!type) return;
+            tags.forEach(tag => {
                 const btn = document.createElement('button');
                 btn.className = 'tag px-3 py-1 rounded-full text-sm';
-                btn.dataset.category = type; 
-                btn.textContent = type;
+                btn.dataset.category = tag.id;
+                btn.dataset.i18nKey = `tag_${tag.id}`; // For translation
+                btn.textContent = tag[`name_${currentLang}`] || tag['name_zh-TW'];
                 filterContainer.appendChild(btn);
             });
-            
-            filterAndDisplayShops();
-            renderLeaderboard();
-        }
-        if (data && data.announcements && String(data.announcements).trim()) {
-            ui.announcementText.textContent = data.announcements;
-            ui.announcementBar.classList.remove('hidden');
-        }
 
-        initializeMap();
-        setLanguage(currentLang);
-        setupEventListeners();
+            // Fetch announcements
+            const announcementsDoc = await getDoc(doc(db, 'site_settings', 'announcements'));
+            if (announcementsDoc.exists() && announcementsDoc.data().text) {
+                ui.announcementText.textContent = announcementsDoc.data().text;
+                ui.announcementBar.classList.remove('hidden');
+            }
+
+            initializeMap();
+            setLanguage(currentLang); // This will also trigger the first render
+            renderLeaderboard();
+            setupEventListeners();
+
+        } catch (error) {
+            showErrorModal(error, 'Initialization');
+        } finally {
+            ui.loadingOverlay.classList.add('hidden');
+        }
     }
 
     function initializeMap() {

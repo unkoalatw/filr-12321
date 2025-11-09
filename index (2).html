@@ -198,10 +198,17 @@ document.addEventListener('DOMContentLoaded', () => {
              ui.loginScreen.classList.remove('hidden');
         }
     };
+    window.checkLogin = checkLogin; // Expose for testing
 
     const openModal = (title, bodyHtml, saveHandler) => {
         ui.modalTitle.textContent = title;
         ui.modalBody.innerHTML = bodyHtml;
+
+        // Reset save button appearance before showing modal
+        ui.saveModalButton.textContent = '儲存';
+        ui.saveModalButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+        ui.saveModalButton.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+
         ui.formModal.classList.remove('hidden');
         const newSaveButton = ui.saveModalButton.cloneNode(true);
         ui.saveModalButton.parentNode.replaceChild(newSaveButton, ui.saveModalButton);
@@ -210,6 +217,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const closeModal = () => ui.formModal.classList.add('hidden');
+
+    const openConfirmationModal = (title, message, onConfirm) => {
+        const bodyHtml = `<p>${message}</p>`;
+        openModal(title, bodyHtml, () => {
+            onConfirm();
+            closeModal();
+        });
+        // Change the save button text to be more explicit
+        ui.saveModalButton.textContent = '確認';
+    };
     
     const openShopForm = async (shopId = null) => {
         const [shopData, tagsData] = await Promise.all([
@@ -361,6 +378,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector(`[data-section="${sectionId}"]`).classList.add('active');
         try {
             ui.mainContent.innerHTML = await pageRenderers[sectionId]();
+            if (sectionId === 'mainDashboard') {
+                setupCsvImport();
+            }
         } catch(e) {
             ui.mainContent.innerHTML = `<div class="text-red-500 p-4 bg-red-100 rounded">無法載入。請檢查錯誤彈窗以獲取詳細資訊。</div>`;
         }
@@ -393,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     header: true,
                     complete: (results) => {
                         displayCsvPreview(results.data);
-                        confirmAndUpload(file);
+                        confirmAndUpload(file, results.data);
                     }
                 });
             } else {
@@ -412,8 +432,8 @@ document.addEventListener('DOMContentLoaded', () => {
              previewDiv.classList.remove('hidden');
         }
 
-        function confirmAndUpload(file) {
-            if (confirm(`預覽正確嗎？確定要匯入 ${Papa.parse(file, { header: true }).data.length} 間店家嗎？`)) {
+        function confirmAndUpload(file, parsedData) {
+            if (confirm(`預覽正確嗎？確定要匯入 ${parsedData.length} 間店家嗎？`)) {
                 const reader = new FileReader();
                 reader.onload = async (event) => {
                     try {
@@ -445,29 +465,56 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 if (target.id === 'add-shop') { openShopForm(); }
                 if (action === 'edit-shop') { openShopForm(id); }
-                if (action === 'delete-shop' && confirm(`確定要將此店家移至回收桶嗎？`)) {
-                    await apiFetch('deleteShop', { id });
-                    showToast('店家已移至回收桶');
-                    navigateTo('shops');
+                if (action === 'delete-shop') {
+                    openConfirmationModal('移至回收桶', '確定要將此店家移至回收桶嗎？', async () => {
+                        await apiFetch('deleteShop', { id });
+                        showToast('店家已移至回收桶');
+                        navigateTo('shops');
+                    });
                 }
-                if (action === 'restore-shop' && confirm('確定要還原此店家嗎？')) {
-                    await apiFetch('restoreShop', { id });
-                    showToast('店家已還原');
-                    navigateTo('bannedShops');
+                if (action === 'restore-shop') {
+                    openConfirmationModal('還原店家', '確定要還原此店家嗎？', async () => {
+                        await apiFetch('restoreShop', { id });
+                        showToast('店家已還原');
+                        navigateTo('bannedShops');
+                    });
                 }
-                if (action === 'delete-shop-permanently' && prompt('此操作無法復原。請輸入店家 ID 以確認永久刪除：') === id) {
-                    await apiFetch('deleteShopPermanently', { id });
-                    showToast('店家已永久刪除');
-                    navigateTo('bannedShops');
+                if (action === 'delete-shop-permanently') {
+                    const shopData = await apiFetch('getShopById', { id });
+                    const shop = shopData.shop;
+                    const title = '永久刪除店家';
+                    const bodyHtml = `
+                        <p class="text-red-600 font-bold mb-4">警告：此操作無法復原！</p>
+                        <p>請輸入店家名稱 "<span class="font-bold">${shop['name_zh-TW']}</span>" 以確認永久刪除。</p>
+                        <input type="text" id="deleteConfirmationInput" class="w-full border p-2 rounded mt-2" placeholder="請輸入店家名稱">
+                    `;
+                    openModal(title, bodyHtml, async () => {
+                        const input = document.getElementById('deleteConfirmationInput').value;
+                        if (input === shop['name_zh-TW']) {
+                            await apiFetch('deleteShopPermanently', { id });
+                            showToast('店家已永久刪除');
+                            closeModal();
+                            navigateTo('bannedShops');
+                        } else {
+                            alert('輸入的名稱不符，無法刪除。');
+                        }
+                    });
+                    ui.saveModalButton.textContent = '確認永久刪除';
+                    ui.saveModalButton.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+                    ui.saveModalButton.classList.add('bg-red-600', 'hover:bg-red-700');
                 }
-                if (action === 'delete-subscriber' && confirm(`確定要刪除此訂閱者嗎？`)) {
-                    await apiFetch('deleteSubscriber', { email });
-                    showToast('訂閱者已刪除');
-                    navigateTo('subscribers');
+                if (action === 'delete-subscriber') {
+                    openConfirmationModal('刪除訂閱者', `確定要刪除訂閱者 ${email} 嗎？`, async () => {
+                        await apiFetch('deleteSubscriber', { email });
+                        showToast('訂閱者已刪除');
+                        navigateTo('subscribers');
+                    });
                 }
-                if (action === 'recommend-shop' && confirm(`確定要向所有訂閱者推薦此店家嗎？`)) {
-                    await apiFetch('sendRecommendation', { shopId: id });
-                    showToast('推薦信已開始發送');
+                if (action === 'recommend-shop') {
+                    openConfirmationModal('推薦店家', '確定要向所有訂閱者推薦此店家嗎？', async () => {
+                         await apiFetch('sendRecommendation', { shopId: id });
+                         showToast('推薦信已開始發送');
+                    });
                 }
                 if (target.id === 'saveAnnouncements') {
                     const content = document.getElementById('announcementsEditor').value;
@@ -480,10 +527,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     await apiFetch('setPolicy', { payload: { key, value } });
                     showToast('政策已儲存');
                 }
-                 if (action === 'delete-tag' && confirm('確定要刪除此標籤嗎？')) {
-                    await apiFetch('deleteTag', { tagId: id });
-                    showToast('標籤已刪除');
-                    navigateTo('tags');
+                 if (action === 'delete-tag') {
+                    openConfirmationModal('刪除標籤', '確定要刪除此標籤嗎？', async () => {
+                        await apiFetch('deleteTag', { tagId: id });
+                        showToast('標籤已刪除');
+                        navigateTo('tags');
+                    });
                 }
             } catch(error) { /* Handled by apiFetch */ }
         });
@@ -501,16 +550,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Setup CSV import only when on dashboard
-        if (document.querySelector('[data-section="mainDashboard"]').classList.contains('active')) {
-            setupCsvImport();
-        }
-        const observer = new MutationObserver(() => {
-            if(document.getElementById('csvImportDropzone')){
-                setupCsvImport();
-            }
-        });
-        observer.observe(ui.mainContent, { childList: true });
     };
 
     setupEventListeners();
