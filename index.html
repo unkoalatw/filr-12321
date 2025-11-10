@@ -121,7 +121,7 @@
                 <h2 class="text-3xl font-bold mb-4" data-i18n="videoSectionTitle">Discover Our Mission</h2>
                 <p class="max-w-3xl mx-auto mb-8 text-gray-600" data-i18n="videoSectionSubtitle">Watch our video to learn more about the Greenroof project and how you can contribute to a more sustainable future.</p>
                 <div class="aspect-w-16 aspect-h-9 max-w-4xl mx-auto">
-                    <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen class="w-full h-full rounded-lg shadow-lg"></iframe>
+                    <iframe src="https://www.youtube.com/embed/s-i6joztqfE" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen class="w-full h-full rounded-lg shadow-lg"></iframe>
                 </div>
             </div>
         </section>
@@ -142,7 +142,7 @@
                             <h3 class="font-medium mb-3" data-i18n="filterCategoryTitle">依類別篩選</h3>
                             <div class="flex flex-wrap gap-2" id="filter-buttons-container">
                                 <button class="tag px-3 py-1 rounded-full text-sm active" data-i18n="filterAll" data-category="all">全部</button>
-                                <button class="tag px-3 py-1 rounded-full text-sm" data-i18n="filterFavorites" data-category="favorites">❤️ 我的收藏</button>
+            <button class="tag px-3 py-1 rounded-full text-sm" data-i18n="filterFavorites" data-category="favorites" style="display: none;">❤️ 我的收藏</button>
                             </div>
                         </div>
                     </div>
@@ -251,13 +251,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ===== GLOBAL STATE =====
     let allShops = [];
+    let currentUser = null;
     let currentFilterCategory = 'all';
     let currentSearchQuery = '';
     const shopsPerPage = 6;
     let currentLoadedShops = 0;
     let mapInstance;
     let markersGroup = L.featureGroup();
-    let favoriteShops = JSON.parse(localStorage.getItem('favoriteShops')) || [];
+    let favoriteShops = []; // This will now be populated from the server
+    let allFavorites = []; // To store the raw favorites data from the server
+    let allRatings = []; // To store the raw ratings data from the server
     let currentLang = localStorage.getItem('lang') || 'en';
 
     const translations = {
@@ -496,11 +499,77 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p><strong>${T('modalPhone')}:</strong> ${shop.phone || T('notProvided')}</p>
                     <p><strong>${T('modalWebsite')}:</strong> ${shop.website ? `<a href="//${shop.website.replace(/^https?:\/\//,'')}" target="_blank" class="text-green-600 hover:underline">${shop.website}</a>` : T('notProvided')}</p>
                  </div>
+                 <div id="ratings-section" class="mt-4">
+                     <h4 class="font-bold text-lg mb-2">Rating</h4>
+                     <div class="flex items-center mb-2">
+                         <div id="average-rating-stars" class="flex text-yellow-400"></div>
+                         <span id="average-rating-text" class="ml-2 text-gray-600"></span>
+                     </div>
+                     <div id="user-rating-section" class="hidden">
+                         <p class="text-sm text-gray-800 mb-1">Your Rating:</p>
+                         <div id="user-rating-stars" class="flex text-2xl cursor-pointer text-gray-300">
+                             <span class="star" data-value="1">★</span>
+                             <span class="star" data-value="2">★</span>
+                             <span class="star" data-value="3">★</span>
+                             <span class="star" data-value="4">★</span>
+                             <span class="star" data-value="5">★</span>
+                         </div>
+                     </div>
+                 </div>
             </div>
         `;
         
         ui.shopDetailModal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
+
+        // --- Rating Logic ---
+        const shopRatings = allRatings.filter(r => r.shopId == shopId);
+        const averageRating = shopRatings.length > 0
+            ? shopRatings.reduce((sum, r) => sum + r.rating, 0) / shopRatings.length
+            : 0;
+
+        document.getElementById('average-rating-stars').innerHTML = renderStarRating(Math.round(averageRating));
+        document.getElementById('average-rating-text').textContent = `${averageRating.toFixed(1)} (${shopRatings.length} reviews)`;
+
+        if (currentUser) {
+            const userRatingSection = document.getElementById('user-rating-section');
+            userRatingSection.classList.remove('hidden');
+            const userRating = shopRatings.find(r => r.userId === currentUser.sub);
+
+            const userStars = document.querySelectorAll('#user-rating-stars .star');
+
+            const updateUserStars = (rating) => {
+                userStars.forEach(star => {
+                    star.classList.toggle('text-yellow-400', star.dataset.value <= rating);
+                    star.classList.toggle('text-gray-300', star.dataset.value > rating);
+                });
+            };
+
+            if (userRating) {
+                updateUserStars(userRating.rating);
+            }
+
+            const submitRating = async (rating) => {
+                const result = await apiFetch('addRating', {
+                    payload: { shopId, rating, userId: currentUser.sub }
+                });
+                if (result) {
+                    const existingRatingIndex = allRatings.findIndex(r => r.shopId == shopId && r.userId === currentUser.sub);
+                    if (existingRatingIndex > -1) {
+                        allRatings[existingRatingIndex].rating = rating;
+                    } else {
+                        allRatings.push({ shopId, userId: currentUser.sub, rating });
+                    }
+                    showShopDetail(shopId); // Re-render the modal to show updated average
+                }
+            };
+
+            userStars.forEach(star => {
+                star.addEventListener('mouseover', () => updateUserStars(star.dataset.value));
+                star.addEventListener('mouseout', () => updateUserStars(userRating ? userRating.rating : 0));
+                star.addEventListener('click', () => submitRating(parseInt(star.dataset.value)));
+            });
+        }
 
         document.getElementById('close-modal').addEventListener('click', closeModal);
     }
@@ -508,6 +577,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeModal() {
         ui.shopDetailModal.classList.add('hidden');
         document.body.style.overflow = 'auto';
+    }
+
+    function renderStarRating(rating) {
+        let stars = '';
+        for (let i = 1; i <= 5; i++) {
+            stars += `<span class="star ${i <= rating ? 'text-yellow-400' : 'text-gray-300'}">${i <= rating ? '★' : '☆'}</span>`;
+        }
+        return stars;
     }
 
     function showMessage(message) {
@@ -523,20 +600,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    window.handleCredentialResponse = (response) => {
-        const credential = response.credential;
+    function updateLoginState(credential) {
         const profile = decodeJwt(credential);
         if (profile) {
+            currentUser = profile;
+            localStorage.setItem('google_credential', credential);
+
             document.querySelector('.g_id_signin').classList.add('hidden');
-            document.getElementById('user-profile').classList.remove('hidden');
+            const userProfile = document.getElementById('user-profile');
+            userProfile.classList.remove('hidden');
+            userProfile.classList.add('flex'); // Make it a flex container
             document.getElementById('user-avatar').src = profile.picture;
+            document.querySelector('[data-category="favorites"]').style.display = 'inline-block';
+
+            favoriteShops = allFavorites
+                .filter(fav => fav.userId === currentUser.sub)
+                .map(fav => fav.shopId);
+
+            // Re-render UI elements that depend on user state
+            filterAndDisplayShops();
+        } else {
+            logout();
         }
     }
 
+    window.handleCredentialResponse = (response) => {
+        updateLoginState(response.credential);
+    }
+
     function logout() {
+        currentUser = null;
+        localStorage.removeItem('google_credential');
+        favoriteShops = [];
+
         document.querySelector('.g_id_signin').classList.remove('hidden');
-        document.getElementById('user-profile').classList.add('hidden');
+        const userProfile = document.getElementById('user-profile');
+        userProfile.classList.add('hidden');
+        userProfile.classList.remove('flex');
         document.getElementById('user-avatar').src = '';
+        document.querySelector('[data-category="favorites"]').style.display = 'none';
+        if (currentFilterCategory === 'favorites') {
+            document.querySelector('[data-category="all"]').click();
+        }
+
+        // Re-render UI elements that depend on user state
+        filterAndDisplayShops();
     }
 
     // ===== EVENT HANDLERS =====
@@ -556,21 +664,34 @@ document.addEventListener('DOMContentLoaded', () => {
         filterAndDisplayShops();
     }
     
-    function toggleFavorite(shopId) {
-        const index = favoriteShops.indexOf(shopId);
-        if (index > -1) {
-            favoriteShops.splice(index, 1);
-        } else {
-            favoriteShops.push(shopId);
+    async function toggleFavorite(shopId) {
+        if (!currentUser) {
+            showMessage("Please sign in to save your favorite shops.");
+            return;
         }
-        localStorage.setItem('favoriteShops', JSON.stringify(favoriteShops));
-        
-        const btn = document.querySelector(`.favorite-btn[data-shop-id="${shopId}"]`);
-        if(btn) btn.classList.toggle('favorited', index === -1);
 
-        if (currentFilterCategory === 'favorites') {
-            currentLoadedShops = 0;
-            filterAndDisplayShops();
+        const isFavorited = favoriteShops.includes(shopId);
+        const userId = currentUser.sub;
+
+        const result = await apiFetch('toggleFavorite', {
+            payload: { shopId, userId, isFavorited: !isFavorited }
+        });
+
+        if (result) {
+            if (!isFavorited) {
+                favoriteShops.push(shopId);
+            } else {
+                const index = favoriteShops.indexOf(shopId);
+                if (index > -1) favoriteShops.splice(index, 1);
+            }
+
+            const btn = document.querySelector(`.favorite-btn[data-shop-id="${shopId}"]`);
+            if(btn) btn.classList.toggle('favorited', !isFavorited);
+
+            if (currentFilterCategory === 'favorites') {
+                currentLoadedShops = 0;
+                filterAndDisplayShops();
+            }
         }
     }
 
@@ -590,6 +711,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await apiFetch('getPublicData');
         if (data && data.shops) {
             allShops = data.shops;
+            allFavorites = data.favorites || [];
+            allRatings = data.ratings || [];
             
             const shopTypes = [...new Set(allShops.map(s => s['type_zh-TW']))];
             const filterContainer = document.getElementById('filter-buttons-container');
@@ -612,6 +735,11 @@ document.addEventListener('DOMContentLoaded', () => {
         initializeMap();
         setLanguage(currentLang);
         setupEventListeners();
+
+        const savedCredential = localStorage.getItem('google_credential');
+        if (savedCredential) {
+            updateLoginState(savedCredential);
+        }
     }
 
     function initializeMap() {
@@ -691,7 +819,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeGoogleSignIn();
 
     if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID') {
-        document.getElementById('client-id-warning').classList.remove('hidden');
+        const warningBanner = document.getElementById('client-id-warning');
+        warningBanner.classList.remove('hidden');
+        warningBanner.innerHTML = '<strong>CRITICAL:</strong> The Google Client ID is a placeholder. <strong>Sign-in will not work.</strong> Replace "YOUR_GOOGLE_CLIENT_ID" with a valid ID in `index.html` to enable login, rating, and favoriting features.';
+        console.error("CRITICAL: Google Client ID is a placeholder and sign-in will not function. Please replace 'YOUR_GOOGLE_CLIENT_ID' in index.html with a valid one from your Google Cloud Console.");
     }
 });
 </script>

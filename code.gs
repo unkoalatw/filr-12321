@@ -23,6 +23,8 @@ const SUBSCRIBERS_SHEET_NAME = 'Subscribers';
 const ANNOUNCEMENTS_SHEET_NAME = 'Announcements';
 const POLICIES_SHEET_NAME = 'Policies';
 const FEEDBACK_SHEET_NAME = 'Feedback';
+const RATINGS_SHEET_NAME = 'Ratings';
+const FAVORITES_SHEET_NAME = 'Favorites';
 
 // =================================================================
 // UTILITY FUNCTIONS
@@ -109,7 +111,9 @@ const getPublicData = () => {
     return {
         shops: resolveShopTags(rawShops),
         policies: getPolicies(),
-        announcements: getAnnouncements().announcements
+        announcements: getAnnouncements().announcements,
+        ratings: getRatings(),
+        favorites: getFavorites()
     };
 };
 
@@ -263,10 +267,76 @@ const sendRecommendation = ({shopId}) => {
     return { message: "推薦信功能待開發，但請求已成功接收。" };
 };
 
+const getRatings = () => {
+    const sheet = openOrCreateSheet(RATINGS_SHEET_NAME, ['shopId', 'userId', 'rating', 'timestamp']);
+    if (sheet.getLastRow() < 2) return [];
+    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
+    return values.map(row => ({ shopId: row[0], userId: row[1], rating: row[2], timestamp: row[3] }));
+};
+
+const getFavorites = () => {
+    const sheet = openOrCreateSheet(FAVORITES_SHEET_NAME, ['shopId', 'userId', 'timestamp']);
+    if (sheet.getLastRow() < 2) return [];
+    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues();
+    return values.map(row => ({ shopId: row[0], userId: row[1], timestamp: row[2] }));
+};
+
+const addRating = ({ shopId, rating, userId }) => {
+    if (!shopId || !rating || !userId) throw new Error("Missing required rating data.");
+    if (rating < 1 || rating > 5) throw new Error("Rating must be between 1 and 5.");
+
+    const sheet = openOrCreateSheet(RATINGS_SHEET_NAME, ['shopId', 'userId', 'rating', 'timestamp']);
+    const ratings = sheet.getRange(2, 1, sheet.getLastRow(), 2).getValues();
+
+    let foundRow = -1;
+    for (let i = 0; i < ratings.length; i++) {
+        if (ratings[i][0] == shopId && ratings[i][1] == userId) {
+            foundRow = i + 2;
+            break;
+        }
+    }
+
+    if (foundRow > -1) {
+        sheet.getRange(foundRow, 3).setValue(rating);
+        sheet.getRange(foundRow, 4).setValue(new Date());
+    } else {
+        sheet.appendRow([shopId, userId, rating, new Date()]);
+    }
+
+    return { message: "Rating saved successfully." };
+};
+
+const toggleFavorite = ({ shopId, userId, isFavorited }) => {
+    if (!shopId || !userId || isFavorited === undefined) throw new Error("Missing required favorite data.");
+
+    const sheet = openOrCreateSheet(FAVORITES_SHEET_NAME, ['shopId', 'userId', 'timestamp']);
+    const favorites = sheet.getRange(2, 1, sheet.getLastRow(), 2).getValues();
+
+    let foundRow = -1;
+    for (let i = 0; i < favorites.length; i++) {
+        if (favorites[i][0] == shopId && favorites[i][1] == userId) {
+            foundRow = i + 2;
+            break;
+        }
+    }
+
+    if (isFavorited) { // Add to favorites
+        if (foundRow === -1) {
+            sheet.appendRow([shopId, userId, new Date()]);
+        }
+    } else { // Remove from favorites
+        if (foundRow > -1) {
+            sheet.deleteRow(foundRow);
+        }
+    }
+
+    return { message: "Favorite status updated." };
+};
+
 // =================================================================
 // MAIN HANDLERS
 // =================================================================
-const publicActions = { getPublicData, subscribe, submitFeedback, login };
+const publicActions = { getPublicData, subscribe, submitFeedback, login, addRating, toggleFavorite };
 const adminActions = { getDashboardStats, getSubscribers, deleteSubscriber, getAnnouncements, setAnnouncements, getPolicies, setPolicy, getShops, getShopById, saveShop, deleteShop, sendRecommendation, getTags, addTag, deleteTag };
 
 function doPost(e) {
